@@ -20,15 +20,15 @@ export async function processNewsUrl(url: string) {
         const parsedInsight = JSON.parse(cleanJson);
 
         // 3. DB 저장 (Supabase 사용 시)
-        const newNews: Omit<NewsItem, 'id'> = {
+        const newNews = {
             title: parsedInsight.title,
             category: parsedInsight.category,
             summary: parsedInsight.summary,
             impact: parsedInsight.impact,
             actions: parsedInsight.actions,
-            originalImageUrl: "https://images.unsplash.com/photo-1585829365234-781fcd04c838?w=800", // 기본 이미지
-            aiImageUrl: "https://images.unsplash.com/photo-1614728263952-84ea256f9679?w=800", // AI 생성 이미지
-            createdAt: new Date().toISOString(),
+            original_image_url: "https://images.unsplash.com/photo-1585829365234-781fcd04c838?w=800",
+            ai_generated_image_url: "https://images.unsplash.com/photo-1614728263952-84ea256f9679?w=800",
+            created_at: new Date().toISOString(),
         };
 
         const { data, error } = await supabase
@@ -50,14 +50,31 @@ export async function processNewsUrl(url: string) {
 }
 
 export async function fetchAllNews() {
-    const { data, error } = await supabase
-        .from('news')
-        .select('*')
-        .order('createdAt', { ascending: false });
+    try {
+        const { data, error } = await supabase
+            .from('news')
+            .select('*')
+            .order('created_at', { ascending: false });
 
-    if (error) {
-        console.error("뉴스 불러오기 에러:", error);
+        if (error) {
+            console.error("DB 불러오기 에러:", error);
+            return [];
+        }
+
+        // DB 필드명(snake_case)을 앱 타입(camelCase)으로 매핑
+        return data.map(item => ({
+            id: item.id,
+            title: item.title,
+            category: item.category,
+            summary: item.summary,
+            impact: item.impact,
+            actions: item.actions,
+            originalImageUrl: item.original_image_url,
+            aiImageUrl: item.ai_generated_image_url,
+            createdAt: item.created_at
+        })) as NewsItem[];
+    } catch (err) {
+        console.error("패치 중 예외 발생:", err);
         return [];
     }
-    return data as NewsItem[];
 }
