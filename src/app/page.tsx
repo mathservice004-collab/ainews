@@ -1,34 +1,57 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { MOCK_NEWS } from "@/types/mockData";
-import { Category } from "@/types/news";
+import { Category, NewsItem } from "@/types/news";
 import NewsCard from "@/components/NewsCard";
 import CategoryTabs from "@/components/CategoryTabs";
 import { motion, AnimatePresence } from "framer-motion";
-import { Sparkles, Globe, Zap, Plus, X, Link as LinkIcon, Loader2 } from "lucide-react";
+import { Sparkles, Globe, Zap, Plus, X, Link as LinkIcon, Loader2, RefreshCcw } from "lucide-react";
+import { processNewsUrl, fetchAllNews } from "@/app/actions/processNews";
 
 export default function Home() {
+  const [news, setNews] = useState<NewsItem[]>(MOCK_NEWS);
   const [activeCategory, setActiveCategory] = useState<Category | 'All'>('All');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [newsUrl, setNewsUrl] = useState("");
   const [isProcessing, setIsProcessing] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
 
   const categories: Category[] = ['Economy', 'Edutech', 'Science', 'Society', 'Bio'];
 
+  useEffect(() => {
+    async function loadNews() {
+      setIsLoading(true);
+      const dbNews = await fetchAllNews();
+      if (dbNews && dbNews.length > 0) {
+        setNews([...dbNews, ...MOCK_NEWS]); // DB 데이터와 Mock 데이터를 합침
+      }
+      setIsLoading(false);
+    }
+    loadNews();
+  }, []);
+
   const filteredNews = activeCategory === 'All'
-    ? MOCK_NEWS
-    : MOCK_NEWS.filter(item => item.category === activeCategory);
+    ? news
+    : news.filter(item => item.category === activeCategory);
 
   const handleProcessNews = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsProcessing(true);
-    // Simulate processing
-    await new Promise(resolve => setTimeout(resolve, 3000));
+
+    const result = await processNewsUrl(newsUrl);
+
+    if (result.success) {
+      // 성공 시 목록 갱신을 위해 다시 불러오기
+      const updatedNews = await fetchAllNews();
+      setNews([...updatedNews, ...MOCK_NEWS]);
+      setIsModalOpen(false);
+      setNewsUrl("");
+    } else {
+      alert(result.error || "처리 중 오류가 발생했습니다.");
+    }
+
     setIsProcessing(false);
-    setIsModalOpen(false);
-    setNewsUrl("");
-    alert("In this demo, news processing is simulated. In production, this would call your AI pipeline.");
   };
 
   return (
@@ -42,16 +65,25 @@ export default function Home() {
             className="flex items-center gap-2 text-indigo-400 font-semibold tracking-widest text-sm uppercase"
           >
             <Sparkles size={16} />
-            <span>Next-Gen Intelligence</span>
+            <span>차세대 인텔리전스</span>
           </motion.div>
 
-          <button
-            onClick={() => setIsModalOpen(true)}
-            className="group flex items-center gap-2 px-5 py-2.5 rounded-2xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold transition-all shadow-lg shadow-indigo-500/20"
-          >
-            <Plus size={18} className="group-hover:rotate-90 transition-transform" />
-            Add Global News
-          </button>
+          <div className="flex gap-3">
+            <button
+              onClick={() => window.location.reload()}
+              className="p-2.5 rounded-2xl bg-white/5 border border-white/10 text-slate-400 hover:text-white transition-all"
+              title="새로고침"
+            >
+              <RefreshCcw size={20} className={isLoading ? "animate-spin" : ""} />
+            </button>
+            <button
+              onClick={() => setIsModalOpen(true)}
+              className="group flex items-center gap-2 px-5 py-2.5 rounded-2xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold transition-all shadow-lg shadow-indigo-500/20"
+            >
+              <Plus size={18} className="group-hover:rotate-90 transition-transform" />
+              글로벌 뉴스 분석 추가
+            </button>
+          </div>
         </div>
 
         <div className="flex flex-col md:flex-row md:items-end justify-between gap-6">
@@ -60,19 +92,19 @@ export default function Home() {
               Insight<span className="text-gradient">Sphere</span> AI
             </h1>
             <p className="text-slate-400 text-lg max-w-2xl">
-              Global news structured into actionable insights using advanced AI models.
-              Visualize complexity, understand impact, and act strategically.
+              매일의 글로벌 뉴스를 AI로 구조화하여 실시간 전략적 인사이트를 제공합니다.
+              시장을 선도하는 지능형 웹앱, InsightSphere와 함께하세요.
             </p>
           </div>
 
           <div className="hidden lg:flex gap-4">
             <div className="flex items-center gap-2 px-4 py-2 rounded-2xl bg-indigo-500/10 border border-indigo-500/20 text-indigo-300">
               <Globe size={18} />
-              <span className="text-sm font-semibold">Global Coverage</span>
+              <span className="text-sm font-semibold">글로벌 커버리지</span>
             </div>
             <div className="flex items-center gap-2 px-4 py-2 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-300">
               <Zap size={18} />
-              <span className="text-sm font-semibold">Real-time Analysis</span>
+              <span className="text-sm font-semibold">실시간 분석 중</span>
             </div>
           </div>
         </div>
@@ -85,20 +117,30 @@ export default function Home() {
         onCategoryChange={setActiveCategory}
       />
 
+      {/* Loading State */}
+      {isLoading && (
+        <div className="flex flex-col items-center justify-center py-24 gap-4">
+          <Loader2 className="animate-spin text-indigo-500" size={48} />
+          <p className="text-slate-400 font-medium font-mono">가장 최신의 인사이트를 불러오는 중...</p>
+        </div>
+      )}
+
       {/* News Grid */}
-      <motion.div
-        layout
-        className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8"
-      >
-        <AnimatePresence mode="popLayout">
-          {filteredNews.map((item) => (
-            <NewsCard key={item.id} item={item} />
-          ))}
-        </AnimatePresence>
-      </motion.div>
+      {!isLoading && (
+        <motion.div
+          layout
+          className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8"
+        >
+          <AnimatePresence mode="popLayout">
+            {filteredNews.map((item) => (
+              <NewsCard key={item.id} item={item} />
+            ))}
+          </AnimatePresence>
+        </motion.div>
+      )}
 
       {/* Empty State */}
-      {filteredNews.length === 0 && (
+      {!isLoading && filteredNews.length === 0 && (
         <motion.div
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
@@ -107,7 +149,7 @@ export default function Home() {
           <div className="w-16 h-16 rounded-3xl bg-slate-800/50 flex items-center justify-center mb-4 border border-slate-700">
             <Sparkles size={32} />
           </div>
-          <p className="text-lg">No news found in this category yet.</p>
+          <p className="text-lg">해당 카테고리에 아직 뉴스가 없습니다.</p>
         </motion.div>
       )}
 
@@ -131,6 +173,7 @@ export default function Home() {
               <button
                 onClick={() => setIsModalOpen(false)}
                 className="absolute top-6 right-6 text-slate-400 hover:text-white transition-colors"
+                disabled={isProcessing}
               >
                 <X size={24} />
               </button>
@@ -140,8 +183,8 @@ export default function Home() {
                   <div className="w-16 h-16 rounded-2xl bg-indigo-500/10 border border-indigo-500/20 flex items-center justify-center text-indigo-400 mx-auto mb-4">
                     <LinkIcon size={32} />
                   </div>
-                  <h2 className="text-2xl font-bold text-white">Process Global Intelligence</h2>
-                  <p className="text-slate-400">Enter a news URL to extract structured insights and generate AI visuals.</p>
+                  <h2 className="text-2xl font-bold text-white">글로벌 인텔리전스 분석</h2>
+                  <p className="text-slate-400">분석할 뉴스 URL을 입력하면 Gemini AI가 구조화된 인사이트를 즉시 추출합니다.</p>
                 </div>
 
                 <form onSubmit={handleProcessNews} className="space-y-4">
@@ -162,29 +205,25 @@ export default function Home() {
                     {isProcessing ? (
                       <>
                         <Loader2 className="animate-spin" size={20} />
-                        AI Agent is Analyzing...
+                        Gemini AI가 기사를 읽고 분석 중...
                       </>
                     ) : (
                       <>
                         <Zap size={20} />
-                        Start Intelligent Analysis
+                        딥 분석 시작 및 결과 저장
                       </>
                     )}
                   </button>
                 </form>
 
                 <div className="pt-4 border-t border-slate-800 flex justify-center gap-6">
-                  <div className="flex items-center gap-1.5 text-[10px] text-slate-500 uppercase font-black tracking-tighter">
-                    <span className="w-1.5 h-1.5 rounded-full bg-indigo-500" />
+                  <div className="flex items-center gap-1.5 text-[10px] text-indigo-400 uppercase font-black tracking-tighter">
+                    <span className="w-1.5 h-1.5 rounded-full bg-indigo-500 animate-pulse" />
                     Gemini 1.5 Pro
                   </div>
-                  <div className="flex items-center gap-1.5 text-[10px] text-slate-500 uppercase font-black tracking-tighter">
-                    <span className="w-1.5 h-1.5 rounded-full bg-indigo-500" />
-                    Structured JSON
-                  </div>
-                  <div className="flex items-center gap-1.5 text-[10px] text-slate-500 uppercase font-black tracking-tighter">
-                    <span className="w-1.5 h-1.5 rounded-full bg-indigo-500" />
-                    AI Concept Gen
+                  <div className="flex items-center gap-1.5 text-[10px] text-indigo-400 uppercase font-black tracking-tighter">
+                    <span className="w-1.5 h-1.5 rounded-full bg-indigo-500 animate-pulse" />
+                    실시간 정형화
                   </div>
                 </div>
               </div>
@@ -197,17 +236,17 @@ export default function Home() {
       <footer className="pt-24 border-t border-slate-800/50">
         <div className="glass-card rounded-[2.5rem] p-12 flex flex-col md:flex-row items-center justify-between gap-8">
           <div className="space-y-2">
-            <h2 className="text-2xl font-bold text-white">Unlock Deep Intelligence</h2>
-            <p className="text-slate-400">Subscribe for weekly strategic briefings based on global news.</p>
+            <h2 className="text-2xl font-bold text-white">심층 인텔리전스 구독</h2>
+            <p className="text-slate-400">매일 아침 세계의 흐름을 요약한 전략 브리핑을 받아보세요.</p>
           </div>
           <div className="flex w-full md:w-auto gap-2">
             <input
               type="email"
-              placeholder="Enter your email"
+              placeholder="이메일을 입력하세요"
               className="flex-grow md:w-80 bg-slate-900/50 border border-slate-700 rounded-2xl px-6 py-4 text-white focus:outline-none focus:ring-2 focus:ring-indigo-500/50 transition-all"
             />
             <button className="bg-indigo-600 hover:bg-indigo-500 text-white font-bold px-8 py-4 rounded-2xl transition-all">
-              Join Now
+              지금 구독하기
             </button>
           </div>
         </div>

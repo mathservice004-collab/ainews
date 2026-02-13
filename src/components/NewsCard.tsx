@@ -11,6 +11,14 @@ interface NewsCardProps {
 }
 
 export default function NewsCard({ item }: NewsCardProps) {
+    const categoryMap: Record<string, string> = {
+        'Economy': '경제',
+        'Edutech': '에듀테크',
+        'Science': '과학',
+        'Society': '사회',
+        'Bio': '바이오'
+    };
+
     return (
         <motion.div
             initial={{ opacity: 0, y: 20 }}
@@ -31,7 +39,7 @@ export default function NewsCard({ item }: NewsCardProps) {
                     <div className="absolute inset-0 bg-gradient-to-t from-[#020617] via-[#020617]/20 to-transparent" />
                     <div className="absolute top-4 left-4">
                         <div className="px-3 py-1 rounded-full text-[10px] font-black bg-indigo-600 text-white uppercase tracking-[0.2em] shadow-lg shadow-indigo-600/40">
-                            {item.category}
+                            {categoryMap[item.category] || item.category}
                         </div>
                     </div>
                 </div>
@@ -56,21 +64,21 @@ export default function NewsCard({ item }: NewsCardProps) {
                         <div className="flex flex-col gap-1">
                             <div className="flex items-center gap-1.5 text-emerald-400 text-[10px] uppercase font-bold tracking-tight">
                                 <TrendingUp size={12} />
-                                <span>Short Impact</span>
+                                <span>단기 영향</span>
                             </div>
                             <p className="text-xs text-slate-400 line-clamp-2">{item.impact.short}</p>
                         </div>
                         <div className="flex flex-col gap-1">
                             <div className="flex items-center gap-1.5 text-amber-400 text-[10px] uppercase font-bold tracking-tight">
                                 <AlertCircle size={12} />
-                                <span>Key Risk</span>
+                                <span>핵심 리스크</span>
                             </div>
                             <p className="text-xs text-slate-400 line-clamp-2">{item.impact.risk}</p>
                         </div>
                     </div>
 
                     <div className="mt-auto w-full py-3 rounded-xl bg-slate-800/50 hover:bg-slate-700/50 border border-slate-700/50 transition-all flex items-center justify-center gap-2 text-sm font-semibold text-slate-300 group">
-                        View Detailed Insight
+                        상세 인사이트 보기
                         <ArrowUpRight size={16} className="group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-transform" />
                     </div>
                 </div>

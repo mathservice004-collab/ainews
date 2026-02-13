@@ -12,8 +12,26 @@ export default function NewsDetail() {
     const item = MOCK_NEWS.find(n => n.id === id);
 
     if (!item) {
-        return <div className="text-white">News not found</div>;
+        return (
+            <div className="flex flex-col items-center justify-center min-h-[60vh] text-white">
+                <h1 className="text-2xl font-bold mb-4">뉴스를 찾을 수 없습니다.</h1>
+                <button
+                    onClick={() => router.push('/')}
+                    className="text-indigo-400 hover:underline"
+                >
+                    홈으로 돌아가기
+                </button>
+            </div>
+        );
     }
+
+    const categoryMap: Record<string, string> = {
+        'Economy': '경제',
+        'Edutech': '에듀테크',
+        'Science': '과학',
+        'Society': '사회',
+        'Bio': '바이오'
+    };
 
     return (
         <div className="space-y-12 pb-24">
@@ -23,7 +41,7 @@ export default function NewsDetail() {
                 className="flex items-center gap-2 text-slate-400 hover:text-white transition-colors group"
             >
                 <ArrowLeft size={20} className="group-hover:-translate-x-1 transition-transform" />
-                <span className="font-medium">Back to Insights</span>
+                <span className="font-medium">인사이트 목록으로 돌아가기</span>
             </button>
 
             {/* Hero Section */}
@@ -34,20 +52,20 @@ export default function NewsDetail() {
                         animate={{ opacity: 1, x: 0 }}
                     >
                         <span className="px-3 py-1 rounded-full text-xs font-semibold bg-indigo-500/20 border border-indigo-500/30 text-indigo-300 uppercase tracking-widest">
-                            {item.category}
+                            {categoryMap[item.category] || item.category}
                         </span>
                         <h1 className="text-4xl md:text-5xl font-black text-white mt-4 leading-tight">
                             {item.title}
                         </h1>
                         <p className="text-slate-400 text-sm mt-4">
-                            Published on {new Date(item.createdAt).toLocaleDateString()}
+                            발행일: {new Date(item.createdAt).toLocaleDateString('ko-KR')}
                         </p>
                     </motion.div>
 
                     <div className="space-y-4">
                         <h2 className="text-xl font-bold text-white flex items-center gap-2">
                             <Lightbulb className="text-amber-400" size={24} />
-                            Executive Summary
+                            핵심 요약 (Executive Summary)
                         </h2>
                         <div className="space-y-3">
                             {item.summary.map((point, i) => (
@@ -82,7 +100,7 @@ export default function NewsDetail() {
                         />
                         <div className="absolute inset-0 bg-gradient-to-t from-[#020617] via-transparent to-transparent opacity-60" />
                         <div className="absolute top-4 right-4 px-3 py-1 rounded-full bg-black/40 backdrop-blur-md text-[10px] text-white font-black uppercase tracking-widest border border-white/10">
-                            Source Visual
+                            원본 기사 이미지
                         </div>
                     </div>
 
@@ -98,9 +116,9 @@ export default function NewsDetail() {
                         <div className="absolute bottom-0 left-0 right-0 p-8">
                             <div className="flex items-center gap-2 text-indigo-400 font-black text-[10px] uppercase tracking-[0.3em] mb-2">
                                 <ImageIcon size={14} className="animate-pulse" />
-                                <span>Gemini Structural Analysis</span>
+                                <span>Gemini 구조 분석 시각화</span>
                             </div>
-                            <p className="text-white text-base font-bold leading-tight">AI Generated Conceptual Insight Illustration</p>
+                            <p className="text-white text-base font-bold leading-tight">AI가 생성한 개념 분석 일러스트레이션</p>
                         </div>
                     </div>
                 </motion.div>
@@ -113,7 +131,7 @@ export default function NewsDetail() {
                     <div className="w-12 h-12 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-400">
                         <TrendingUp size={24} />
                     </div>
-                    <h3 className="text-xl font-bold text-white">Short-term Impact</h3>
+                    <h3 className="text-xl font-bold text-white">단기적 영향</h3>
                     <p className="text-slate-400 leading-relaxed">{item.impact.short}</p>
                 </div>
 
@@ -122,7 +140,7 @@ export default function NewsDetail() {
                     <div className="w-12 h-12 rounded-2xl bg-indigo-500/10 border border-indigo-500/20 flex items-center justify-center text-indigo-400">
                         <Globe size={24} />
                     </div>
-                    <h3 className="text-xl font-bold text-white">Long-term Meaning</h3>
+                    <h3 className="text-xl font-bold text-white">장기적 의미</h3>
                     <p className="text-slate-400 leading-relaxed">{item.impact.long}</p>
                 </div>
 
@@ -131,7 +149,7 @@ export default function NewsDetail() {
                     <div className="w-12 h-12 rounded-2xl bg-rose-500/10 border border-rose-500/20 flex items-center justify-center text-rose-400">
                         <AlertCircle size={24} />
                     </div>
-                    <h3 className="text-xl font-bold text-white">Critical Risks</h3>
+                    <h3 className="text-xl font-bold text-white">핵심 리스크</h3>
                     <p className="text-slate-400 leading-relaxed">{item.impact.risk}</p>
                 </div>
             </div>
@@ -140,7 +158,7 @@ export default function NewsDetail() {
             <section className="space-y-8">
                 <h2 className="text-3xl font-black text-white flex items-center gap-3">
                     <Zap className="text-indigo-500" size={32} />
-                    Strategic Actions
+                    전략적 행동 제안
                 </h2>
 
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
@@ -148,7 +166,7 @@ export default function NewsDetail() {
                     <div className="space-y-4">
                         <div className="flex items-center gap-3 text-emerald-400 bg-emerald-500/5 p-4 rounded-2xl border border-emerald-500/10">
                             <Briefcase size={20} />
-                            <span className="font-bold uppercase tracking-widest text-sm">For Investors</span>
+                            <span className="font-bold uppercase tracking-widest text-sm">투자자(Investor)를 위한 제안</span>
                         </div>
                         <ul className="space-y-3">
                             {item.actions.investor.map((action, i) => (
@@ -164,7 +182,7 @@ export default function NewsDetail() {
                     <div className="space-y-4">
                         <div className="flex items-center gap-3 text-amber-400 bg-amber-500/5 p-4 rounded-2xl border border-amber-500/10">
                             <GraduationCap size={20} />
-                            <span className="font-bold uppercase tracking-widest text-sm">For Educators</span>
+                            <span className="font-bold uppercase tracking-widest text-sm">교육자(Educator)를 위한 제안</span>
                         </div>
                         <ul className="space-y-3">
                             {item.actions.educator.map((action, i) => (
@@ -180,7 +198,7 @@ export default function NewsDetail() {
                     <div className="space-y-4">
                         <div className="flex items-center gap-3 text-indigo-400 bg-indigo-500/5 p-4 rounded-2xl border border-indigo-500/10">
                             <Users size={20} />
-                            <span className="font-bold uppercase tracking-widest text-sm">For Founders</span>
+                            <span className="font-bold uppercase tracking-widest text-sm">창업자(Founder)를 위한 제안</span>
                         </div>
                         <ul className="space-y-3">
                             {item.actions.founder.map((action, i) => (
