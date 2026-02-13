@@ -38,13 +38,20 @@ export default function Home() {
 
   const handleSyncNews = async () => {
     setIsSyncing(true);
-    const result = await syncGlobalNews();
-    if (result.success) {
-      const updatedNews = await fetchAllNews();
-      setNews([...updatedNews, ...MOCK_NEWS]);
-      alert(`${result.count}개의 새로운 글로벌 뉴스가 동기화되었습니다.`);
+    try {
+      const result = await syncGlobalNews();
+      if (result.success) {
+        const updatedNews = await fetchAllNews();
+        setNews([...updatedNews, ...MOCK_NEWS]);
+        alert(`${result.count}개의 새로운 글로벌 뉴스가 동기화되었습니다. (중복 ${result.skipped || 0}개 제외)`);
+      } else {
+        alert(`동기화 실패: ${result.error}`);
+      }
+    } catch (err) {
+      alert("네트워크 또는 서버 오류가 발생했습니다.");
+    } finally {
+      setIsSyncing(false);
     }
-    setIsSyncing(false);
   };
 
   const handleProcessNews = async (e: React.FormEvent) => {
