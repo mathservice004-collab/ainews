@@ -8,74 +8,77 @@ import Parser from "rss-parser";
 
 const parser = new Parser();
 
+// RSS 피드 목록 (테스트를 위해 우선 2개로 축소)
 const RSS_FEEDS = [
-    { name: 'Yonhap', url: 'https://www.yonhapnewstv.co.kr/browse/feed/', category: 'Society' },
-    { name: 'NYT', url: 'https://rss.nytimes.com/services/xml/rss/nyt/World.xml', category: 'Economy' },
-    { name: 'BBC', url: 'http://feeds.bbci.co.uk/news/world/rss.xml', category: 'Science' }
+    { name: '연합뉴스', url: 'https://www.yonhapnewstv.co.kr/browse/feed/', category: 'Society' },
+    { name: 'NYT', url: 'https://rss.nytimes.com/services/xml/rss/nyt/World.xml', category: 'Economy' }
 ];
 
-// 환경 변수 체크
 function checkEnv() {
-    return !!(process.env.GEMINI_API_KEY && process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY);
+    const keys = {
+        GEMINI: !!process.env.GEMINI_API_KEY,
+        SUPABASE_URL: !!process.env.NEXT_PUBLIC_SUPABASE_URL,
+        SUPABASE_KEY: !!process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+    };
+    console.log("환경 변수 체크:", keys);
+    return keys.GEMINI && keys.SUPABASE_URL && keys.SUPABASE_KEY;
 }
 
 export async function syncGlobalNews() {
     if (!checkEnv()) {
-        return { success: false, error: "서버 환경 변수(API 키 등)가 설정되지 않았습니다. Vercel 설정을 확인해주세요." };
+        return { success: false, error: "서버 설정(API 키)이 누락되었습니다. Vercel 환경 변수를 확인해주세요." };
     }
 
-    console.log("뉴스 동기화 시작...");
     let successCount = 0;
     let skipCount = 0;
 
     for (const feed of RSS_FEEDS) {
         try {
+            console.log(`${feed.name} 데이터 가져오는 중...`);
             const feedData = await parser.parseURL(feed.url);
-            const items = feedData.items.slice(0, 3); // 각 피드당 3개씩
 
-            for (const item of items) {
-                if (!item.title) continue;
+            // 타임아웃 방지를 위해 피드당 '가장 최신 1개'만 우선 처리
+            const item = feedData.items[0];
+            if (!item || !item.title) continue;
 
-                // 중복 체크
-                const { data: existing } = await supabase
-                    .from('news')
-                    .select('id')
-                    .eq('title', item.title.trim())
-                    .maybeSingle();
+            // 중복 체크
+            const { data: existing } = await supabase
+                .from('news')
+                .select('id')
+                .eq('title', item.title.trim())
+                .maybeSingle();
 
-                if (existing) {
-                    skipCount++;
-                    continue;
-                }
-
-                const content = `${item.title}. ${item.contentSnippet || item.content || ""}`;
-                const insightJsonString = await generateNewsInsight(content);
-
-                if (insightJsonString) {
-                    const cleanJson = insightJsonString.replace(/```json|```/g, "").trim();
-                    const parsed = JSON.parse(cleanJson);
-
-                    const newNews = {
-                        title: item.title.trim(),
-                        category: parsed.category || feed.category,
-                        summary: parsed.summary,
-                        impact: parsed.impact,
-                        actions: parsed.actions,
-                        original_image_url: "https://images.unsplash.com/photo-1504711434969-e33886168f5c?w=1000",
-                        ai_generated_image_url: "https://images.unsplash.com/photo-1614728263952-84ea256f9679?w=1000",
-                        created_at: new Date().toISOString(),
-                    };
-
-                    const { error: insertError } = await supabase.from('news').insert([newNews]);
-                    if (insertError) {
-                        console.error("Insert Error:", insertError);
-                    } else {
-                        successCount++;
-                    }
-                }
+            if (existing) {
+                skipCount++;
+                continue;
             }
-        } catch (err) {
-            console.error(`${feed.name} 처리 중 에러:`, err);
+
+            console.log(`AI 분석 시작: ${item.title}`);
+            const content = `${item.title}. ${item.contentSnippet || item.content || ""}`;
+            const insightJsonString = await generateNewsInsight(content);
+
+            if (insightJsonString) {
+                const cleanJson = insightJsonString.replace(/```json|```/g, "").trim();
+                const parsed = JSON.parse(cleanJson);
+
+                const newNews = {
+                    title: item.title.trim(),
+                    category: parsed.category || feed.category,
+                    summary: parsed.summary || [],
+                    impact: parsed.impact || { short: "", long: "", risk: "" },
+                    actions: parsed.actions || { investor: [], educator: [], founder: [] },
+                    original_image_url: "https://images.unsplash.com/photo-1504711434969-e33886168f5c?w=1000",
+                    ai_generated_image_url: "https://images.unsplash.com/photo-1620712943543-bcc462824100?w=1000",
+                    created_at: new Date().toISOString(),
+                };
+
+                const { error: insertError } = await supabase.from('news').insert([newNews]);
+                if (!insertError) successCount++;
+                else console.error("DB 저장 에러:", insertError);
+            }
+        } catch (err: any) {
+            console.error(`${feed.name} 처리 에러:`, err.message);
+            // 개별 피드 에러는 무시하고 다음 피드로 진행
         }
     }
 
@@ -90,10 +93,7 @@ export async function fetchAllNews() {
             .select('*')
             .order('created_at', { ascending: false });
 
-        if (error) {
-            console.error("DB 불러오기 에러:", error);
-            return [];
-        }
+        if (error) throw error;
 
         return (data || []).map(item => ({
             id: item.id,
@@ -107,26 +107,18 @@ export async function fetchAllNews() {
             createdAt: item.created_at
         })) as NewsItem[];
     } catch (err) {
-        console.error("패치 에러:", err);
+        console.error("뉴스 로딩 실패:", err);
         return [];
     }
 }
 
 export async function processNewsUrl(url: string) {
-    if (!checkEnv()) {
-        return { success: false, error: "API 키가 설정되지 않았습니다." };
-    }
-
+    // 수동 분석은 1개씩 처리되므로 타임아웃 위험이 적음
     try {
-        // 실제 운영 시에는 이 부분에 뉴스 스크래핑 로직이 들어갑니다.
-        const mockContentForUrl = "사용자가 입력한 URL에서 추출된 뉴스 본문 예시입니다.";
-        const insightJsonString = await generateNewsInsight(mockContentForUrl);
-
+        const insightJsonString = await generateNewsInsight(`URL 분석 요청: ${url}`);
         if (!insightJsonString) throw new Error("AI 분석 실패");
 
-        const cleanJson = insightJsonString.replace(/```json|```/g, "").trim();
-        const parsedInsight = JSON.parse(cleanJson);
-
+        const parsedInsight = JSON.parse(insightJsonString.replace(/```json|```/g, "").trim());
         const newNews = {
             title: parsedInsight.title,
             category: parsedInsight.category,
@@ -142,6 +134,6 @@ export async function processNewsUrl(url: string) {
         revalidatePath("/");
         return { success: true, data };
     } catch (err) {
-        return { success: false, error: "뉴스 처리 중 오류가 발생했습니다." };
+        return { success: false, error: "뉴스 처리 실패" };
     }
 }
