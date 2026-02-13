@@ -6,8 +6,8 @@ import { Category, NewsItem } from "@/types/news";
 import NewsCard from "@/components/NewsCard";
 import CategoryTabs from "@/components/CategoryTabs";
 import { motion, AnimatePresence } from "framer-motion";
-import { Sparkles, Globe, Zap, Plus, X, Link as LinkIcon, Loader2, RefreshCcw } from "lucide-react";
-import { processNewsUrl, fetchAllNews } from "@/app/actions/processNews";
+import { Sparkles, Globe, Zap, Plus, X, Link as LinkIcon, Loader2, RefreshCcw, Rss } from "lucide-react";
+import { processNewsUrl, fetchAllNews, syncGlobalNews } from "@/app/actions/processNews";
 
 export default function Home() {
   const [news, setNews] = useState<NewsItem[]>(MOCK_NEWS);
@@ -16,6 +16,7 @@ export default function Home() {
   const [newsUrl, setNewsUrl] = useState("");
   const [isProcessing, setIsProcessing] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
+  const [isSyncing, setIsSyncing] = useState(false);
 
   const categories: Category[] = ['Economy', 'Edutech', 'Science', 'Society', 'Bio'];
 
@@ -34,6 +35,17 @@ export default function Home() {
   const filteredNews = activeCategory === 'All'
     ? news
     : news.filter(item => item.category === activeCategory);
+
+  const handleSyncNews = async () => {
+    setIsSyncing(true);
+    const result = await syncGlobalNews();
+    if (result.success) {
+      const updatedNews = await fetchAllNews();
+      setNews([...updatedNews, ...MOCK_NEWS]);
+      alert(`${result.count}개의 새로운 글로벌 뉴스가 동기화되었습니다.`);
+    }
+    setIsSyncing(false);
+  };
 
   const handleProcessNews = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -70,6 +82,15 @@ export default function Home() {
 
           <div className="flex gap-3">
             <button
+              onClick={handleSyncNews}
+              disabled={isSyncing}
+              className="flex items-center gap-2 px-4 py-2.5 rounded-2xl bg-indigo-500/10 border border-indigo-500/20 text-indigo-300 hover:bg-indigo-500/20 transition-all disabled:opacity-50"
+              title="글로벌 뉴스 동기화"
+            >
+              {isSyncing ? <Loader2 size={18} className="animate-spin" /> : <Rss size={18} />}
+              <span className="text-sm font-bold truncate hidden sm:inline">글로벌 동기화</span>
+            </button>
+            <button
               onClick={() => window.location.reload()}
               className="p-2.5 rounded-2xl bg-white/5 border border-white/10 text-slate-400 hover:text-white transition-all"
               title="새로고침"
@@ -81,7 +102,7 @@ export default function Home() {
               className="group flex items-center gap-2 px-5 py-2.5 rounded-2xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold transition-all shadow-lg shadow-indigo-500/20"
             >
               <Plus size={18} className="group-hover:rotate-90 transition-transform" />
-              글로벌 뉴스 분석 추가
+              <span className="hidden sm:inline">글로벌 뉴스 분석 추가</span>
             </button>
           </div>
         </div>

@@ -4,22 +4,75 @@ import { generateNewsInsight } from "@/lib/gemini";
 import { supabase } from "@/lib/supabase";
 import { NewsItem } from "@/types/news";
 import { revalidatePath } from "next/cache";
+import Parser from "rss-parser";
+
+const parser = new Parser();
+
+const RSS_FEEDS = [
+    { name: 'Yonhap', url: 'https://www.yonhapnewstv.co.kr/browse/feed/', category: 'Society' },
+    { name: 'NYT', url: 'https://rss.nytimes.com/services/xml/rss/nyt/World.xml', category: 'Economy' }
+];
+
+export async function syncGlobalNews() {
+    console.log("뉴스 동기화 시작...");
+    let successCount = 0;
+
+    for (const feed of RSS_FEEDS) {
+        try {
+            const feedData = await parser.parseURL(feed.url);
+            // 최신 2개 기사만 샘플링하여 처리 (과부하 방지)
+            const items = feedData.items.slice(0, 2);
+
+            for (const item of items) {
+                // 중복 체크 (제목 기준)
+                const { data: existing } = await supabase
+                    .from('news')
+                    .select('id')
+                    .eq('title', item.title)
+                    .single();
+
+                if (existing) continue;
+
+                const content = `${item.title}. ${item.contentSnippet || item.content || ""}`;
+                const insightJsonString = await generateNewsInsight(content);
+
+                if (insightJsonString) {
+                    const cleanJson = insightJsonString.replace(/```json|```/g, "").trim();
+                    const parsed = JSON.parse(cleanJson);
+
+                    const newNews = {
+                        title: item.title,
+                        category: parsed.category || feed.category,
+                        summary: parsed.summary,
+                        impact: parsed.impact,
+                        actions: parsed.actions,
+                        original_image_url: "https://images.unsplash.com/photo-1504711434969-e33886168f5c?w=800",
+                        ai_generated_image_url: "https://images.unsplash.com/photo-1614728263952-84ea256f9679?w=800",
+                        created_at: new Date().toISOString(),
+                    };
+
+                    await supabase.from('news').insert([newNews]);
+                    successCount++;
+                }
+            }
+        } catch (err) {
+            console.error(`${feed.name} 페치 에러:`, err);
+        }
+    }
+
+    revalidatePath("/");
+    return { success: true, count: successCount };
+}
 
 export async function processNewsUrl(url: string) {
     try {
-        // 1. 실제 뉴스 데이터 수크랩 로직 (여기서는 예시 텍스트로 대체)
-        // 실제 운영 시에는 cheerio나 puppeteer 등을 사용하여 URL의 본문을 추출합니다.
         const rawContent = `뉴스 URL(${url})에서 추출된 원문 데이터 예시...`;
-
-        // 2. Gemini AI를 통한 구조화 분석
         const insightJsonString = await generateNewsInsight(rawContent);
         if (!insightJsonString) throw new Error("AI 분석 실패");
 
-        // JSON 파싱 (Gemini 응답이 마크다운 코드 블록 등으로 올 수 있으므로 정제 필요)
         const cleanJson = insightJsonString.replace(/```json|```/g, "").trim();
         const parsedInsight = JSON.parse(cleanJson);
 
-        // 3. DB 저장 (Supabase 사용 시)
         const newNews = {
             title: parsedInsight.title,
             category: parsedInsight.category,
@@ -36,10 +89,7 @@ export async function processNewsUrl(url: string) {
             .insert([newNews])
             .select();
 
-        if (error) {
-            console.error("DB 저장 에러:", error);
-            // DB 연결이 안되어 있으면 로컬 메모리에라도 추가하는 로직이 필요할 수 있음
-        }
+        if (error) console.error("DB 저장 에러:", error);
 
         revalidatePath("/");
         return { success: true, data };
@@ -61,7 +111,6 @@ export async function fetchAllNews() {
             return [];
         }
 
-        // DB 필드명(snake_case)을 앱 타입(camelCase)으로 매핑
         return data.map(item => ({
             id: item.id,
             title: item.title,
